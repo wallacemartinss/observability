@@ -1,0 +1,60 @@
+{
+    "name": "kronn/observability",
+    "description": "Telemetria e APM da plataforma Kronn para aplicações Laravel.",
+    "keywords": ["kronn", "observability", "apm", "telemetry", "monitoring", "laravel"],
+    "homepage": "https://kronn.io",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/kronn-io/observability/issues",
+        "source": "https://github.com/kronn-io/observability"
+    },
+    "authors": [
+        {
+            "name": "Kronn",
+            "homepage": "https://kronn.io"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "laravel/framework": "^10.0|^11.0|^12.0|^13.0",
+        "monolog/monolog": "^3.0",
+        "psr/log": "^1.0|^2.0|^3.0",
+        "ramsey/uuid": "^4.0"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^7.0",
+        "guzzlehttp/promises": "^2.0",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Kronn\\Observability\\": "src/"
+        },
+        "files": [
+            "src/Support/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Kronn\\Observability\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Kronn\\Observability\\ObservabilityServiceProvider"
+            ],
+            "aliases": {
+                "Telemetry": "Kronn\\Observability\\Facades\\Telemetry"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

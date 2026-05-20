@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+# Excluded from `composer archive` / dist tarballs on Packagist.
+/tests              export-ignore
+/.gitignore         export-ignore
+/.gitattributes     export-ignore
+/phpunit.xml        export-ignore
