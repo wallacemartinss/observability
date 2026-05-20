@@ -29,7 +29,7 @@ class Envelope
             'kronn' => [
                 'schema' => 'v1',
                 'type' => $type->value,
-                'timestamp_ms' => (int) round($timestampMicrotime * 1000),
+                'timestamp_ms' => $timestampMicrotime * 1000,
                 'trace_id' => $state->traceId,
                 'parent_trace_id' => $state->parentTraceId,
                 'execution_id' => $state->executionId,

@@ -27,11 +27,12 @@ final class EnvelopeTest extends TestCase
         $state->tags = ['area' => 'billing'];
         $state->extras = ['cart_size' => 7];
 
-        $envelope = Envelope::build($state, RecordType::Request, 200.5, 'group-hash');
+        $envelope = Envelope::build($state, RecordType::Request, 200.500456, 'group-hash');
 
         self::assertSame('v1', $envelope['kronn']['schema']);
         self::assertSame('request', $envelope['kronn']['type']);
-        self::assertSame(200_500, $envelope['kronn']['timestamp_ms']);
+        self::assertEqualsWithDelta(200_500.456, $envelope['kronn']['timestamp_ms'], 0.001);
+        self::assertIsFloat($envelope['kronn']['timestamp_ms']);
         self::assertSame('trace-abc', $envelope['kronn']['trace_id']);
         self::assertSame('parent-123', $envelope['kronn']['parent_trace_id']);
         self::assertSame('exec-xyz', $envelope['kronn']['execution_id']);
