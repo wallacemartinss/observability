@@ -31,6 +31,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Events\Terminating;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Notifications\Events\NotificationSending;
@@ -66,6 +67,7 @@ use Kronn\Observability\Listeners\JobProcessingListener;
 use Kronn\Observability\Listeners\LivewireListener;
 use Kronn\Observability\Listeners\LogoutListener;
 use Kronn\Observability\Listeners\MailListener;
+use Kronn\Observability\Listeners\MessageLoggedListener;
 use Kronn\Observability\Listeners\NotificationListener;
 use Kronn\Observability\Listeners\OctaneListener;
 use Kronn\Observability\Listeners\PreparingResponseListener;
@@ -248,15 +250,21 @@ class ObservabilityServiceProvider extends ServiceProvider
 
         $core->setTypeFilters($this->buildTypeFilters());
 
-        $core->selfFailureReporter = static function (Throwable $throwable): void {
-            try {
-                Log::channel(config('logging.default'))->warning(
-                    '[kronn/observability] internal error: ' . $throwable->getMessage(),
-                    ['exception' => $throwable]
-                );
-            } catch (Throwable) {
-                // Last-resort fallback: swallow.
-            }
+        // Wrap the Log call in $core->ignore() so the MessageLoggedListener
+        // (registered below) does NOT recurse into Core::record() when we
+        // log our own internal warnings. Without this, an internal failure
+        // could create a feedback loop.
+        $core->selfFailureReporter = static function (Throwable $throwable) use ($core): void {
+            $core->ignore(static function () use ($throwable): void {
+                try {
+                    Log::channel(config('logging.default'))->warning(
+                        '[kronn/observability] internal error: ' . $throwable->getMessage(),
+                        ['exception' => $throwable]
+                    );
+                } catch (Throwable) {
+                    // Last-resort fallback: swallow.
+                }
+            });
         };
 
         // When the HTTP transport receives a 401, the API key is bad — disable
@@ -349,6 +357,19 @@ class ObservabilityServiceProvider extends ServiceProvider
 
         // Propagate trace id into queued job payloads (read back when the worker rehydrates the job).
         Queue::createPayloadUsing(new CreateQueuePayloadListener($core));
+
+        // Laravel log capture — every Log::* call dispatches MessageLogged.
+        // We listen here and emit a kronn-v1 log record (level filter from config).
+        $logLevelName = (string) ($this->config['filters']['log_level'] ?? 'debug');
+        $minLevel = MessageLoggedListener::levelFromName($logLevelName);
+        $events->listen(
+            MessageLogged::class,
+            (new MessageLoggedListener(
+                core: $core,
+                minLevel: $minLevel,
+                defaultChannel: (string) ($this->app['config']->get('logging.default') ?? 'app'),
+            ))(...),
+        );
     }
 
     private function registerHttpHooks(Core $core, Dispatcher $events): void
