@@ -89,6 +89,7 @@ use Kronn\Observability\Support\LaravelFeatures;
 use Kronn\Observability\Support\Location;
 use Kronn\Observability\Support\Uuid;
 use Kronn\Observability\Transports\Factory as TransportFactory;
+use Kronn\Observability\Transports\HttpTransport;
 use Throwable;
 
 class ObservabilityServiceProvider extends ServiceProvider
@@ -257,6 +258,18 @@ class ObservabilityServiceProvider extends ServiceProvider
                 // Last-resort fallback: swallow.
             }
         };
+
+        // When the HTTP transport receives a 401, the API key is bad — disable
+        // the SDK locally so we stop hammering the backend with invalid creds.
+        // User has to fix .env and reboot to recover.
+        if ($transport instanceof HttpTransport) {
+            $transport->onUnauthorized = static function () use ($core): void {
+                $core->enabled = false;
+                $core->reportSelfFailure(new \RuntimeException(
+                    '[kronn/observability] API key rejected (401). SDK disabled until next boot.'
+                ));
+            };
+        }
 
         $this->core = $core;
         $this->app->instance(Core::class, $core);

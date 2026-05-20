@@ -51,6 +51,16 @@ return [
             'driver' => 'log',
             'path' => storage_path('logs/kronn.ndjson'),
         ],
+        'http' => [
+            'driver' => 'http',
+            // Hardcoded default — production customers never set KRONN_INGEST_URL.
+            // The env var exists only for our own dev/staging environments.
+            'endpoint' => env('KRONN_INGEST_URL', 'https://ingest.kronn.io/v1/ingest'),
+            'timeout' => env('KRONN_HTTP_TIMEOUT', 2.0),
+            'retries' => env('KRONN_HTTP_RETRIES', 3),
+            'compress' => env('KRONN_HTTP_COMPRESS', true),
+            'idempotent' => env('KRONN_HTTP_IDEMPOTENT', false),
+        ],
         'socket' => [
             'driver' => 'socket',
             'endpoint' => env('KRONN_SOCKET_ENDPOINT', '127.0.0.1:4317'),

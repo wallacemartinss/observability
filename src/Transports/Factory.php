@@ -54,6 +54,15 @@ class Factory
             path: (string) ($config['path'] ?? sys_get_temp_dir() . '/kronn.ndjson'),
         );
 
+        $this->factories['http'] = static fn (array $config, string $apiKey): Transport => new HttpTransport(
+            endpoint: (string) ($config['endpoint'] ?? 'https://ingest.kronn.io/v1/ingest'),
+            apiKey: $apiKey,
+            timeoutSeconds: (float) ($config['timeout'] ?? 2.0),
+            retryAttempts: (int) ($config['retries'] ?? 3),
+            compress: (bool) ($config['compress'] ?? true),
+            idempotent: (bool) ($config['idempotent'] ?? false),
+        );
+
         $uuid = $this->uuid;
         $this->factories['socket'] = static fn (array $config, string $apiKey): Transport => new SocketTransport(
             endpoint: (string) ($config['endpoint'] ?? '127.0.0.1:4317'),
