@@ -11,6 +11,10 @@ use Throwable;
  * the application registers (via Telemetry::user(...)) is invoked lazily
  * inside an "ignore block" — any telemetry produced during resolution is
  * dropped to avoid feedback loops.
+ *
+ * If no resolver is registered, falls back to ['id' => $user->getAuthIdentifier()]
+ * so records still carry the authenticated user's ID — the Authenticatable
+ * contract guarantees this method.
  */
 class UserResolver
 {
@@ -55,9 +59,6 @@ class UserResolver
         $this->hasResolved = true;
 
         $resolver = ($this->resolverProvider)();
-        if (! is_callable($resolver)) {
-            return $this->resolved = null;
-        }
 
         try {
             $this->resolved = ($this->isolated)(static function ($auth) use ($resolver) {
@@ -66,9 +67,13 @@ class UserResolver
                     return null;
                 }
 
-                $details = $resolver($user);
+                if (is_callable($resolver)) {
+                    $details = $resolver($user);
+                    return is_array($details) ? $details : null;
+                }
 
-                return is_array($details) ? $details : null;
+                $id = method_exists($user, 'getAuthIdentifier') ? $user->getAuthIdentifier() : null;
+                return $id === null ? null : ['id' => $id];
             });
         } catch (Throwable $e) {
             ($this->errorReporter)($e);
