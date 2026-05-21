@@ -7,6 +7,7 @@ namespace Kronn\Observability\Tests\Unit\Transports;
 use Closure;
 use Kronn\Observability\Transports\HttpTransport;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 
 final class HttpTransportTest extends TestCase
 {
@@ -227,6 +228,42 @@ final class HttpTransportTest extends TestCase
         $transport = $this->makeTransport();
 
         self::assertFalse($transport->probe());
+    }
+
+    public function test_parse_stream_headers_reads_status_and_retry_after(): void
+    {
+        $parse = new ReflectionMethod(HttpTransport::class, 'parseStreamHeaders');
+
+        self::assertSame(
+            [202, null],
+            $parse->invoke(null, ['HTTP/1.1 202 Accepted', 'Content-Type: application/json']),
+        );
+
+        self::assertSame(
+            [429, 30],
+            $parse->invoke(null, ['HTTP/1.1 429 Too Many Requests', 'Retry-After: 30']),
+        );
+
+        self::assertSame(
+            [500, null],
+            $parse->invoke(null, ['HTTP/1.0 500 Internal Server Error']),
+        );
+
+        // A redirect chain stacks status lines — the last one wins.
+        self::assertSame(
+            [200, null],
+            $parse->invoke(null, ['HTTP/1.1 301 Moved Permanently', 'Location: /x', 'HTTP/1.1 200 OK']),
+        );
+
+        // Non-numeric Retry-After (HTTP-date form) is ignored, like the curl path.
+        self::assertSame(
+            [429, null],
+            $parse->invoke(null, ['HTTP/1.1 429 Too Many Requests', 'Retry-After: Wed, 21 May 2026 07:28:00 GMT']),
+        );
+
+        // No status line at all → 0, which the ship loop treats as retryable.
+        self::assertSame([0, null], $parse->invoke(null, ['Content-Type: text/plain']));
+        self::assertSame([0, null], $parse->invoke(null, []));
     }
 
     /**

@@ -16,7 +16,6 @@
     ],
     "require": {
         "php": "^8.2",
-        "ext-curl": "*",
         "ext-json": "*",
         "ext-zlib": "*",
         "laravel/framework": "^10.0|^11.0|^12.0|^13.0",
@@ -30,6 +29,9 @@
         "mockery/mockery": "^1.6",
         "orchestra/testbench": "^8.0|^9.0|^10.0",
         "phpunit/phpunit": "^10.0|^11.0|^12.0"
+    },
+    "suggest": {
+        "ext-curl": "Enables the cURL-based HTTP transport. Without it the SDK falls back to the PHP HTTP stream wrapper, which requires allow_url_fopen."
     },
     "autoload": {
         "psr-4": {

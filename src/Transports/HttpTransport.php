@@ -22,7 +22,9 @@ use Kronn\Observability\Support\Version;
  *  - 401 disables the SDK locally via the optional onUnauthorized callback,
  *    so a misconfigured API key does not keep hammering the backend
  *
- * The default HTTP executor uses ext-curl. Tests inject a custom executor
+ * The default HTTP executor prefers ext-curl and falls back to the PHP HTTP
+ * stream wrapper when curl functions are unavailable — a hardened php.ini can
+ * blacklist curl_exec via disable_functions. Tests inject a custom executor
  * to avoid touching the network.
  */
 final class HttpTransport implements Transport
@@ -51,7 +53,8 @@ final class HttpTransport implements Transport
     /**
      * @param  Closure(string, string, string, list<string>): array{0:int, 1:string, 2:?int}|null  $httpExecutor
      *         Custom HTTP executor. Receives (url, method, body, headers) and must return [status, body, retry_after_seconds].
-     *         When null, uses the built-in cURL implementation.
+     *         When null, uses the built-in executor (cURL, or the PHP HTTP
+     *         stream wrapper when curl functions are unavailable).
      */
     public function __construct(
         private readonly string $endpoint,
@@ -243,17 +246,47 @@ final class HttpTransport implements Transport
     }
 
     /**
-     * Built-in cURL executor. Returns [status, response_body, retry_after_seconds].
+     * Default HTTP executor. Prefers ext-curl; when its functions are not
+     * callable it falls back to the PHP HTTP stream wrapper. Returns
+     * [status, response_body, retry_after_seconds].
      *
      * @param  list<string>  $headers
      * @return array{0:int, 1:string, 2:?int}
      */
     private function defaultExecutor(string $url, string $method, string $body, array $headers): array
     {
-        if (! function_exists('curl_init')) {
-            return [0, '', null];
+        if (self::curlUsable()) {
+            return $this->curlExecutor($url, $method, $body, $headers);
         }
 
+        return $this->streamExecutor($url, $method, $body, $headers);
+    }
+
+    /**
+     * True only when every cURL function the request path needs is defined.
+     * function_exists() reports false for functions blocked via
+     * disable_functions, so this also catches a partial curl blacklist
+     * (curl_exec disabled while curl_init is left intact).
+     */
+    private static function curlUsable(): bool
+    {
+        foreach (['curl_init', 'curl_setopt_array', 'curl_exec', 'curl_getinfo', 'curl_close'] as $function) {
+            if (! function_exists($function)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * cURL-backed HTTP request.
+     *
+     * @param  list<string>  $headers
+     * @return array{0:int, 1:string, 2:?int}
+     */
+    private function curlExecutor(string $url, string $method, string $body, array $headers): array
+    {
         $ch = curl_init();
         $retryAfter = null;
 
@@ -298,5 +331,76 @@ final class HttpTransport implements Transport
         }
 
         return [$status, (string) $responseBody, $retryAfter];
+    }
+
+    /**
+     * Fallback HTTP request via the PHP HTTP stream wrapper, used when
+     * ext-curl functions are unavailable. Requires allow_url_fopen.
+     *
+     * @param  list<string>  $headers
+     * @return array{0:int, 1:string, 2:?int}
+     */
+    private function streamExecutor(string $url, string $method, string $body, array $headers): array
+    {
+        $http = [
+            'method' => $method,
+            'header' => implode("\r\n", $headers),
+            'timeout' => $this->timeoutSeconds * 3,
+            'ignore_errors' => true,
+            'follow_location' => 0,
+        ];
+
+        if ($method !== 'HEAD' && $body !== '') {
+            $http['content'] = $body;
+        }
+
+        $context = stream_context_create([
+            'http' => $http,
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $responseBody = @file_get_contents($url, false, $context);
+
+        // The HTTP wrapper populates $http_response_header in this scope.
+        $responseHeaders = $http_response_header ?? [];
+
+        if ($responseBody === false && $responseHeaders === []) {
+            // No response at all — connection-level failure, retryable.
+            return [0, '', null];
+        }
+
+        [$status, $retryAfter] = self::parseStreamHeaders($responseHeaders);
+
+        return [$status, $responseBody === false ? '' : $responseBody, $retryAfter];
+    }
+
+    /**
+     * Extracts the status code and numeric Retry-After (delta-seconds) from
+     * the raw header lines exposed by the HTTP stream wrapper. A redirect
+     * chain stacks status lines, so the last status line wins.
+     *
+     * @param  list<string>  $lines
+     * @return array{0:int, 1:?int}
+     */
+    private static function parseStreamHeaders(array $lines): array
+    {
+        $status = 0;
+        $retryAfter = null;
+
+        foreach ($lines as $line) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})\b#', $line, $matches) === 1) {
+                $status = (int) $matches[1];
+            } elseif (stripos($line, 'Retry-After:') === 0) {
+                $value = trim(substr($line, strlen('Retry-After:')));
+                if (is_numeric($value)) {
+                    $retryAfter = (int) $value;
+                }
+            }
+        }
+
+        return [$status, $retryAfter];
     }
 }
