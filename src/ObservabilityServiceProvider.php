@@ -292,6 +292,7 @@ class ObservabilityServiceProvider extends ServiceProvider
         };
 
         return new UserResolver(
+            guards: $this->resolvableGuards(),
             isolatedRunner: function (callable $callback) use ($core) {
                 $c = $core();
                 return $c !== null ? $c->ignore(fn () => $callback($this->app->make(AuthManager::class))) : null;
@@ -304,6 +305,27 @@ class ObservabilityServiceProvider extends ServiceProvider
                 $core()?->reportSelfFailure($e);
             },
         );
+    }
+
+    /**
+     * Auth guard names the user resolver should probe, default guard first.
+     * A multi-panel app authenticates on one of several guards (e.g. Filament
+     * panels with separate web/admin guards), not only the default.
+     *
+     * @return list<string>
+     */
+    private function resolvableGuards(): array
+    {
+        $config = $this->app['config'];
+
+        $guards = array_keys((array) $config->get('auth.guards', []));
+        $default = $config->get('auth.defaults.guard');
+
+        if (is_string($default) && $default !== '') {
+            array_unshift($guards, $default);
+        }
+
+        return array_values(array_unique($guards));
     }
 
     /**
