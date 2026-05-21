@@ -9,6 +9,11 @@ use Illuminate\Http\Client\Factory;
 /**
  * Installs the Guzzle middleware globally — every Http::client() call
  * becomes instrumented.
+ *
+ * Uses globalMiddleware() (classic handler-stack shape) rather than the
+ * request/response split: globalResponseMiddleware only ever hands the
+ * callback a response, so request/response pairing is impossible there.
+ * The classic middleware keeps both in one closure.
  */
 class HttpClientFactoryResolvedListener
 {
@@ -18,8 +23,6 @@ class HttpClientFactoryResolvedListener
 
     public function __invoke(Factory $factory): void
     {
-        $middleware = $this->middleware;
-        $factory->globalRequestMiddleware(static fn ($request) => $middleware->onRequest($request));
-        $factory->globalResponseMiddleware(static fn ($response, $request = null) => $middleware->onResponse($response, $request));
+        $factory->globalMiddleware($this->middleware->asHandler());
     }
 }

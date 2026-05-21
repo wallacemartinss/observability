@@ -13,55 +13,20 @@ use Throwable;
 
 /**
  * Guzzle middleware that intercepts every request/response pair and
- * emits an OutgoingRequest record. Two usage modes:
+ * emits an OutgoingRequest record.
  *
- *  - classic middleware (callable($handler))
- *  - global request/response middleware via Factory
- *
- * Pairing of request and response happens through spl_object_hash;
- * WeakMap would not work because PSR HTTP messages are immutable and
- * the response object differs from the request object.
+ * Installed as classic handler-stack middleware (callable($handler)):
+ * request and response live in the same closure, so they pair up
+ * naturally without spl_object_hash bookkeeping.
  */
 class GuzzleMiddleware
 {
-    /** @var array<string, float> spl_object_hash -> start microtime */
-    private array $starts = [];
-
     public function __construct(private readonly Core $core)
     {
     }
 
     /**
-     * Hook for globalRequestMiddleware — records the start timestamp.
-     */
-    public function onRequest(RequestInterface $request): RequestInterface
-    {
-        $this->starts[spl_object_hash($request)] = $this->core->clock->microtime();
-        return $request;
-    }
-
-    /**
-     * Hook for globalResponseMiddleware — emits the record using the
-     * start timestamp captured earlier. Falls back to current microtime
-     * (zero duration) if the start was never recorded.
-     */
-    public function onResponse(ResponseInterface $response, RequestInterface $request): ResponseInterface
-    {
-        $end = $this->core->clock->microtime();
-        $hash = spl_object_hash($request);
-        $start = $this->starts[$hash] ?? $end;
-        unset($this->starts[$hash]);
-
-        $this->core->record(
-            RecordType::OutgoingRequest,
-            fn () => $this->core->sensors->outgoingRequest($start, $end, $request, $response),
-        );
-
-        return $response;
-    }
-
-    /**
-     * Classic middleware shape, for manual handler stacks.
+     * Classic middleware shape, for handler stacks and Factory::globalMiddleware.
      *
      * @return callable(callable): callable
      */
