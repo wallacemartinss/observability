@@ -123,6 +123,14 @@ return [
         // The violation handler is non-throwing — the app keeps working,
         // we just observe. Off by default since it flips a global
         // Eloquent setting.
+        //
+        // No effect when the app also calls
+        // Model::automaticallyEagerLoadRelationships() (Laravel 12.8+):
+        // automatic eager loading resolves the relation before the
+        // lazy-loading check runs, so no violation ever fires. For those
+        // apps, rely on query-shape N+1 detection instead
+        // (GET /v1/tenants/{id}/queries/n-plus-one) — it catches N+1 from
+        // any source, not just relation lazy loads.
         'detect_lazy_loading' => env('KRONN_DETECT_LAZY_LOADING', false),
     ],
 
