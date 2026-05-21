@@ -18,4 +18,5 @@ enum RecordType: string
     case JobAttempt = 'job_attempt';
     case ScheduledTask = 'scheduled_task';
     case Log = 'log';
+    case LazyLoad = 'lazy_load';
 }

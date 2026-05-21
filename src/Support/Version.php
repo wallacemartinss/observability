@@ -13,7 +13,7 @@ final class Version
 {
     public const PACKAGE = 'kronn-observability';
 
-    public const VERSION = '0.5.1';
+    public const VERSION = '0.6.0';
 
     public static function userAgent(): string
     {

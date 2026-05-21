@@ -117,6 +117,13 @@ return [
         'ignore_mail' => env('KRONN_IGNORE_MAIL', false),
         'ignore_notifications' => env('KRONN_IGNORE_NOTIFICATIONS', false),
         'log_level' => env('KRONN_LOG_LEVEL', env('LOG_LEVEL', 'debug')),
+
+        // Opt-in: enables Model::preventLazyLoading() and records every
+        // Eloquent lazy-loading violation (model + relation + origin).
+        // The violation handler is non-throwing — the app keeps working,
+        // we just observe. Off by default since it flips a global
+        // Eloquent setting.
+        'detect_lazy_loading' => env('KRONN_DETECT_LAZY_LOADING', false),
     ],
 
     /*

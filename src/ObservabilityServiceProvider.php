@@ -27,6 +27,7 @@ use Illuminate\Console\Events\ScheduledTaskSkipped;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Events\Terminating;
 use Illuminate\Foundation\Http\Events\RequestHandled;
@@ -64,6 +65,7 @@ use Kronn\Observability\Listeners\GuzzleMiddleware;
 use Kronn\Observability\Listeners\HttpClientFactoryResolvedListener;
 use Kronn\Observability\Listeners\JobAttemptListener;
 use Kronn\Observability\Listeners\JobProcessingListener;
+use Kronn\Observability\Listeners\LazyLoadingViolationListener;
 use Kronn\Observability\Listeners\LivewireListener;
 use Kronn\Observability\Listeners\LogoutListener;
 use Kronn\Observability\Listeners\MailListener;
@@ -370,6 +372,17 @@ class ObservabilityServiceProvider extends ServiceProvider
                 defaultChannel: (string) ($this->app['config']->get('logging.default') ?? 'app'),
             ))(...),
         );
+
+        // Eloquent lazy-loading detection — opt-in via KRONN_DETECT_LAZY_LOADING.
+        // Flips on preventLazyLoading() and installs a non-throwing handler:
+        // the app keeps lazy-loading normally, we just record which relation
+        // fired so the N+1 view can name the exact ->with() to add.
+        if ((bool) ($this->config['filters']['detect_lazy_loading'] ?? false)) {
+            Model::preventLazyLoading();
+            Model::handleLazyLoadingViolationUsing(
+                (new LazyLoadingViolationListener($core))(...),
+            );
+        }
     }
 
     private function registerHttpHooks(Core $core, Dispatcher $events): void

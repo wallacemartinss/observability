@@ -58,6 +58,7 @@ class Manager
     private ?JobAttemptSensor $jobAttempt = null;
     private ?ScheduledTaskSensor $scheduledTask = null;
     private ?LogSensor $log = null;
+    private ?LazyLoadSensor $lazyLoad = null;
 
     /**
      * @param  array{
@@ -227,6 +228,16 @@ class Manager
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function lazyLoad(string $modelClass, string $relation): ?array
+    {
+        $sensor = $this->lazyLoad ??= new LazyLoadSensor($this->state, $this->clock, $this->location);
+
+        return $sensor($modelClass, $relation);
+    }
+
+    /**
      * Reset called by queue workers between jobs.
      */
     public function reset(): void
@@ -244,6 +255,7 @@ class Manager
         $this->jobAttempt = null;
         $this->scheduledTask = null;
         $this->log = null;
+        $this->lazyLoad = null;
     }
 
     public function setState(ExecutionState $state): void
