@@ -69,6 +69,44 @@ final class CoreTest extends TestCase
         self::assertTrue($accepted);
     }
 
+    public function test_scheduled_task_sampling_is_independent_of_command_sampling(): void
+    {
+        $core = $this->makeCore();
+        $core->enabled = true;
+        $core->sampling = false;             // commands are dropped
+        $core->scheduledTaskSampling = true; // but scheduled tasks still go through
+
+        $accepted = $core->record(RecordType::ScheduledTask, static fn (): array => ['x' => 1]);
+
+        self::assertTrue($accepted);
+    }
+
+    public function test_scheduled_task_sampling_can_drop_independently(): void
+    {
+        $core = $this->makeCore();
+        $core->enabled = true;
+        $core->sampling = true;               // commands kept
+        $core->scheduledTaskSampling = false; // but scheduled tasks dropped
+
+        $accepted = $core->record(RecordType::ScheduledTask, static fn (): array => ['x' => 1]);
+
+        self::assertFalse($accepted);
+    }
+
+    public function test_decide_scheduled_task_sampling_returns_true_on_rate_one(): void
+    {
+        $core = $this->makeCore();
+
+        self::assertTrue($core->decideScheduledTaskSampling(1.0));
+    }
+
+    public function test_decide_scheduled_task_sampling_returns_false_on_rate_zero(): void
+    {
+        $core = $this->makeCore();
+
+        self::assertFalse($core->decideScheduledTaskSampling(0.0));
+    }
+
     public function test_ignore_block_drops_records(): void
     {
         $core = $this->makeCore();

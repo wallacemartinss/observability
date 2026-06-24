@@ -249,6 +249,7 @@ class ObservabilityServiceProvider extends ServiceProvider
 
         $core->decideSampling((float) ($this->config['sampling'][$this->isHttp ? 'requests' : 'commands'] ?? 1.0));
         $core->decideExceptionSampling((float) ($this->config['sampling']['exceptions'] ?? 1.0));
+        $core->decideScheduledTaskSampling((float) ($this->config['sampling']['scheduled_tasks'] ?? 1.0));
 
         $core->setTypeFilters($this->buildTypeFilters());
 

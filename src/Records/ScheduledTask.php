@@ -24,9 +24,14 @@ class ScheduledTask
     ): array {
         $microtime = $clock->microtime();
         $task = $event->task;
-        $description = method_exists($task, 'description')
-            ? (string) $task->description()
-            : (property_exists($task, 'description') ? (string) $task->description : 'unknown');
+        // Laravel's scheduler exposes the human-friendly label via the public
+        // $description property; description() is a *setter* (one required arg),
+        // so it must never be called as a getter. Fall back to the command.
+        $description = match (true) {
+            property_exists($task, 'description') && $task->description !== null => (string) $task->description,
+            property_exists($task, 'command') && is_string($task->command) => $task->command,
+            default => 'unknown',
+        };
         $expression = property_exists($task, 'expression') ? (string) $task->expression : '';
 
         $outcome = match (true) {

@@ -19,6 +19,8 @@ trait RejectsRecords
 
     public bool $exceptionSampling = true;
 
+    public bool $scheduledTaskSampling = true;
+
     /** @var array<string, bool> Map of RecordType value -> drop flag */
     protected array $typeFilters = [];
 
@@ -34,6 +36,13 @@ trait RejectsRecords
         $this->exceptionSampling = $rate >= 1.0 || ($rate > 0.0 && (mt_rand() / mt_getrandmax()) < $rate);
 
         return $this->exceptionSampling;
+    }
+
+    public function decideScheduledTaskSampling(float $rate): bool
+    {
+        $this->scheduledTaskSampling = $rate >= 1.0 || ($rate > 0.0 && (mt_rand() / mt_getrandmax()) < $rate);
+
+        return $this->scheduledTaskSampling;
     }
 
     /**
@@ -57,6 +66,7 @@ trait RejectsRecords
 
         return match ($type) {
             RecordType::Exception => $this->exceptionSampling,
+            RecordType::ScheduledTask => $this->scheduledTaskSampling,
             default => $this->sampling,
         };
     }

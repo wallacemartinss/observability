@@ -45,7 +45,10 @@ class CacheEvent
             'key' => tiny_text($key),
             'key_shape' => tiny_text(self::keyShape($key)),
             'store' => tiny_text($store),
-            'tags' => method_exists($event, 'tags') ? array_map('strval', $event->tags() ?? []) : [],
+            // Cache tags live under their own key: the envelope already owns
+            // 'tags' for application context, and array union (+) would drop
+            // ours. Read the public $tags property (there is no tags() getter).
+            'cache_tags' => array_map('strval', (array) ($event->tags ?? [])),
         ];
     }
 
